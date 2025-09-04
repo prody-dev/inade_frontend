@@ -1,16 +1,18 @@
 // src/pages/Cotizar.js
 import React, { useState, useMemo } from "react";
-import { Table, Input, Spin, Button, Card, Row, Col } from "antd";
+import { useNavigate } from "react-router-dom";
+import { Table, Input, Spin, Button, Card, Row, Col, Tag, Space } from "antd";
 import { Link } from "react-router-dom";
 import "./cotizar.css";
 import { useCotizacionesData } from "../Cotizacionesjs/usoCotizacionesData";
 import { useCotizacionesColumns } from "../Cotizacionesjs/CotizacionesColumns";
 import { getDetallecotizaciondataById } from "../../../apis/ApisServicioCliente/CotizacionApi";
+import { descifrarId, cifrarId } from "../secretKey/SecretKey";
 
 const Cotizar = () => {
   const [searchText, setSearchText] = useState("");
   const [filteredData, setFilteredData] = useState([]);
-
+  const navigate = useNavigate();
   const [expandedData, setExpandedData] = useState({});
   const [loadingRows, setLoadingRows] = useState({});
 
@@ -61,7 +63,7 @@ const Cotizar = () => {
       try {
         setLoadingRows((prev) => ({ ...prev, [id]: true }));
         const detalle = await getDetallecotizaciondataById(id);
-        console.log(`Detalle de cotización ${id}:`, detalle);
+        // console.log(`Detalle de cotización ${id}:`, detalle);
         setExpandedData((prev) => ({ ...prev, [id]: detalle }));
       } catch (error) {
         console.error(`Error al obtener detalle de cotización ${id}:`, error);
@@ -135,6 +137,18 @@ const Cotizar = () => {
                     <Row justify="center" align="middle" >
                       <Col>
                         <strong>Division:</strong> {detalle.data.cliente?.direccion?.division}
+                      </Col>
+                    </Row>
+                    <Row justify="center" align="middle" >
+                      <Col>
+                        <strong>Estado de aceptación:</strong> {detalle.data.ordenTrabajo?.mensaje} {" -OT: "}
+                        <Space size={[4, 4]} wrap>
+                        {detalle?.data?.ordenTrabajo?.items.map(({id,codigo})=>(
+                          <Tag key={id} onClick={() => navigate(`/DetalleOrdenTrabajo/${cifrarId(id)}`)} style={{ cursor: "pointer" }}>
+                            {codigo || "Pendiente"}
+                          </Tag>
+                        ))}</Space>
+                        {/* {detalle?.data?.ordenTrabajo?.ids?.join(",") || "Pendiente"} */}
                       </Col>
                     </Row>
                     </Card>

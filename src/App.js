@@ -17,6 +17,7 @@ import {
   EditOutlined,
   ThunderboltTwoTone,
   DollarTwoTone,
+  UserSwitchOutlined 
 } from "@ant-design/icons";
 import { Link } from "react-router-dom";
 
@@ -25,6 +26,7 @@ const App = () => {
   // Para progress bar y textos
   const [totalCotizaciones, setTotalCotizaciones] = useState(0);
   const [cotizacionesAceptadas, setCotizacionesAceptadas] = useState(0);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchCount = async () => {
@@ -71,9 +73,12 @@ const App = () => {
         // 3. Cotizaciones aceptadas (estado >= 2)
         const aceptadas = filteredCotizaciones.filter((cot) => cot.estado >= 2).length;
         setCotizacionesAceptadas(aceptadas);
+        await new Promise((resolve) => setTimeout(resolve, 1000));
       } catch (error) {
         console.error("Error al obtener las cotizaciones", error);
-      }
+      }finally {
+      setLoading(false);
+    }
     };
 
     fetchCount();
@@ -167,6 +172,19 @@ const App = () => {
                 </Link>
               </div>
             </Col>
+
+            {/* <Col xs={24} sm={12} md={8} lg={6} xl={4} className="col-style">
+              <div>
+                <Link to="/Receptores">
+                  <Card className="card-custom" title="Receptor" bordered={false}>
+                    <div className="icon-container">
+                      <UserSwitchOutlined />
+                    </div>
+                  </Card>
+                </Link>
+              </div>
+            </Col> */}
+
             <Col xs={24} sm={12} md={8} lg={6} xl={4} className="col-style">
               <div>
                 <Link to="/usuario">

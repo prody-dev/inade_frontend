@@ -7,8 +7,11 @@ const { Text } = Typography;
 export const ConfirmDuplicarModal = ({ visible, onCancel, onConfirm, cotizacionesCliente = [] }) => {
   const [selectedOption, setSelectedOption] = useState(null);
 
-
+// const ids = cotizacionesCliente.map(c => c.id);
+// const dup = ids.filter((id, idx) => ids.indexOf(id) !== idx);
+// console.log('IDs duplicados:', dup);
   const handleOk = () => {
+    // console.log("Opción seleccionada:", selectedOption);
     onConfirm(selectedOption); // enviamos el valor al componente padre
   };
 
@@ -28,15 +31,21 @@ export const ConfirmDuplicarModal = ({ visible, onCancel, onConfirm, cotizacione
         placeholder="Selecciona una cotización del cliente"
         style={{ width: "100%", marginTop: "1rem" }}
         onChange={setSelectedOption}
-        optionFilterProp="label"
+        optionFilterProp="children"
         filterOption={(input, option) =>
-          option.label.toLowerCase().includes(input.toLowerCase())
+          (option?.children + '').toLowerCase().includes(input.toLowerCase())
         }
-        options={cotizacionesCliente.map(cot => ({
-          value: cot.id,
-          label: `#Cot. ${cot.numeroCotizaciones}-${cot.nombreCompleto} - ${cot.empresa.nombre|| "Sin código"}`
-        }))}
-      />
+        
+      >
+        {cotizacionesCliente.map((cot, idx) => (
+          <Select.Option
+            key={`${cot.id}-${idx}`}   // 👈 clave única para React
+            value={cot.id}             // 👈 lo que se envía / regresa onChange
+          >
+            {`#Cot. ${cot.numeroCotizaciones} - ${cot.nombreCompleto} - ${cot.empresa.nombre || 'Sin empresa'}`}
+          </Select.Option>
+        ))}
+      </Select>
     </Modal>
   );
 };

@@ -1,0 +1,278 @@
+
+def datosInformeAR2(request, informe_id):
+    """
+    GET /api/campo/aguaresidualinforme/<informe_id>/datos/
+    """
+    informe = get_object_or_404(
+        AguaResidualInforme.objects.select_related(
+            "OrdenTrabajo",
+            "OrdenTrabajo__cotizacion",
+            "OrdenTrabajo__cotizacion__cliente",
+            "OrdenTrabajo__cotizacion__cliente__empresa",
+        ),
+        id=informe_id,
+    )
+    
+    calibraciones = (
+        CalibracionVerificacion.objects
+        .filter(aguaResidualInforme_id=informe.id)
+        .prefetch_related(
+            # Trae TODAS las CalibracionConductiva de cada CalibracionVerificacion
+            Prefetch(
+                "calibracionconductiva_set",  # sin related_name
+                queryset=CalibracionConductiva.objects.select_related(
+                    # desde CC -> OneToOne reverso a hijos:
+                    "conductividadlaboratorio",
+                    "conductividadlaboratorio__conductividadAceptacionMc",
+                    "conductividadlaboratorio__conductividadAceptacionMr",
+                    "conductividadcampo",
+                    "conductividadcampo__conductividadAceptacionMc",
+                    "conductividadcampo__conductividadAceptacionMr",
+                ),
+                to_attr="prefetched_ccs"  # las tendrás como lista en cal.prefetched_ccs
+            ),
+            Prefetch(
+                "intermediario_set",
+                queryset=Intermediario.objects.select_related(
+                    "protocoloMuestreo", "protocoloMuestreo__sitioMuestreo", "hojaCampo"
+                ),
+                to_attr="prefetched_intermediario_set"
+            ),
+            Prefetch("calibracionph_set", to_attr="prefetched_ph"),
+        )
+    )
+
+    calibracion_data = []
+    for cal in calibraciones:
+        
+        # ---- Intermediarios (tu código actual) ----
+        inters = []
+        for i in getattr(cal, "prefetched_intermediario_set", []):
+            sitio = i.protocoloMuestreo.sitioMuestreo if i.protocoloMuestreo else None
+            inters.append({
+                "id": i.id,
+                "numero": i.numero,
+                "protocoloMuestreo": {
+                    "id": i.protocoloMuestreo_id,
+                    "numero": i.protocoloMuestreo.numero if i.protocoloMuestreo else None,
+                    "sitioMuestreo": {
+                        "id": sitio.id if sitio else None,
+                        "domicilio": sitio.domicilio if sitio else None,
+                        "giroEmpresa": sitio.giroEmpresa if sitio else None,
+                    },
+                },
+                "hojaCampo": {"id": i.hojaCampo_id, "numero": i.hojaCampo.numero if i.hojaCampo else None},
+            })
+        if not inters:
+            inters = [{
+                "id": None,
+                "numeroInter": None,
+                "protocoloMuestreo": {"id": None, "numero": None},
+                "hojaCampo": {"id": None, "numero": None},
+            }]
+
+        # ---- pH (tu código actual) ----
+        ph = [
+            {
+                "id": p.id,
+                "numero": p.numero,
+                "calibracionPhLaboratorio": model_to_dict(p.calibracionPhLaboratorio) if p.calibracionPhLaboratorio else None,
+                "calibracionPhCampo": model_to_dict(p.calibracionPhCampo) if p.calibracionPhCampo else None,
+            }
+            for p in getattr(cal, "prefetched_ph", [])
+        ]
+
+        # ---- Conductividad (todas las CC asociadas a esta calibración) ----
+        ccs_json = []
+        # print(cc)
+        # model_to_dict(cc)
+        print(cal.prefetched_ccs)
+        model_to_dict(cal)
+        for cc in getattr(cal, "prefetched_ccs", []):
+            lab = getattr(cc, "conductividadlaboratorio", None)   # reverso OneToOne por defecto
+            print("cc")
+            print(cc.conductividadlaboratorio)
+            print(lab)
+            campo = getattr(cc, "conductividadcampo", None)
+            print(campo)
+
+            mc_lab  = getattr(lab, "conductividadAceptacionMc", None)   if lab else None
+            print(mc_lab)
+            mr_lab  = getattr(lab, "conductividadAceptacionMr", None)   if lab else None
+            print(mr_lab)
+            mc_campo= getattr(campo, "conductividadAceptacionMc", None) if campo else None
+            print(mc_campo)
+            mr_campo= getattr(campo, "conductividadAceptacionMr", None) if campo else None
+            print(mr_campo)
+
+            ccs_json.append({
+                "id": cc.id,
+                "observacion": cc.observacion,
+                "lab": {
+                    "id": lab.id if lab else None,
+                    "mc": model_to_dict(mc_lab) if mc_lab else None,
+                    "mr": model_to_dict(mr_lab) if mr_lab else None,
+                },
+                "campo": {
+                    "id": campo.id if campo else None,
+                    "mc": model_to_dict(mc_campo) if mc_campo else None,
+                    "mr": model_to_dict(mr_campo) if mr_campo else None,
+                },
+            })
+
+        calibracion_data.append({
+            "id": cal.id,
+            "numero": cal.numero,
+            "equipoUtilizado": cal.equipoUtilizado,
+            "idEquipo": cal.idEquipo,
+            "marcaEquipo": cal.marcaEquipo,
+            "modeloEquipo": cal.modeloEquipo,
+            "serialEquipo": cal.serialEquipo,
+            "calibracionesConductivas": ccs_json,   # <- ahora es lista (porque FK 1:N)
+            "intermediarios": inters,
+            "ph": ph,
+        })
+
+    # si quieres fallback cuando NO hay calibraciones:
+    if not calibracion_data:
+        calibracion_data = [{
+            "id": None,
+            "numero": None,
+            "equipoUtilizado": None,
+            "idEquipo": None,
+            "marcaEquipo": None,
+            "modeloEquipo": None,
+            "serialEquipo": None,
+            "calibracionesConductivas": [],
+            "intermediarios": [{
+                "id": None,
+                "numero": None,
+                "protocoloMuestreo": {"id": None, "numero": None},
+                "hojaCampo": {"id": None, "numero": None},
+            }],
+            "ph": [{"id": None, "calibracionPhLaboratorio": None}],
+        }]
+
+        
+    
+    print(informe.estado)
+    ot   = informe.OrdenTrabajo
+    rec  = ot.receptor
+    coti = ot.cotizacion
+    cli  = coti.cliente
+    emp  = cli.empresa
+    croquis = getattr(informe, "CroquisUbicacion", None)
+    data = {
+        "informe": {
+            "id": informe.id,
+            "numeroInfo": informe.numero,
+            "estatusid":informe.estado.id if informe else None,
+            "estatus":informe.estado.nombre,
+        },
+        "croquis": {
+            "id": croquis.id if croquis else None,
+            "numeroCroquis": croquis.numero if croquis else None,
+            "domicilio": croquis.domicilio if croquis else None,
+            "comentario": croquis.comentario if croquis else None,
+        },
+        "ordenTrabajo": {
+            "id": ot.id,
+            "numero": ot.numero,
+            "codigo": ot.codigo,
+            "estado": ot.estado.nombre,
+            "receptor": (
+                    f"{rec.nombrePila} {rec.apPaterno} {rec.apMaterno}"
+                    if rec else None
+                ),
+        },
+        "cliente": {
+            "id": cli.id,
+            "nombre": f"{cli.nombrePila} {cli.apPaterno} {cli.apMaterno}",
+            "correo": cli.correo,
+            "telefono": cli.celular,
+            "direccion": (f"{cli.calleCliente} {cli.numeroCliente}, {cli.coloniaCliente}, {cli.ciudadCliente}, {cli.estadoCliente}, {cli.codigoPostalCliente} ")
+        },
+        "empresa": {
+            "id": emp.id,
+            "nombre": emp.nombre,
+            "direccion": f"{emp.calle}, {emp.numero}, {emp.colonia}, {emp.ciudad}, {emp.estado}, {emp.codigoPostal}"
+        },
+        "calibraciones": calibracion_data, 
+    }
+    return JsonResponse(data, safe=False)
+
+from django.shortcuts import get_object_or_404
+from django.http import JsonResponse, Http404
+from django.forms.models import model_to_dict
+from django.db.models import Prefetch
+
+from campo.models import CalibracionVerificacion, CalibracionConductiva, ConductividadLaboratorio, ConductividadCampo, ConductividadAceptacionMr, ConductividadAceptacionMc
+#la idea es enviar el id de CalibracionVerificacion este tiee el foreikey de CalibracionConductiva y CalibracionConductiva tiene el foreikey de ConductividadLaboratorioy asi donde ConductividadLaboratorio y ConductividadCampo, estos tiene el forreikey de ConductividadAceptacionMr, ConductividadAceptacionMc, como hago para crear una vista que me muestre todos los datos
+
+def detalles_clibracion_verificacion_conductividad(request, cal_id):
+     """
+     GET /api/campo/calibracion/<cal_id>/
+
+     Devuelve toda la jerarquía de la calibración indicada.
+     """
+     cv=get_object_or_404(
+          CalibracionVerificacion.objects.select_related(
+               "calibracionConductiva",
+               "calibracionConductiva__conductividadLaboratorio",
+               "calibracionConductiva__conductividadLaboratorio__conductividadAceptacionMr",
+               "calibracionConductiva__conductividadLaboratorio__conductividadAceptacionMc",
+               "calibracionConductiva__conductividadCampo",
+               "calibracionConductiva__conductividadCampo__conductividadAceptacionMr",
+               "calibracionConductiva__conductividadCampo__conductividadAceptacionMc",
+          ), id=cal_id,
+     )
+     cc= cv.calibracionConductiva
+     lab = getattr(cc,"conductividadLaboratorio", None)
+     cam= getattr(cc,"conductividadCampo", None)
+     
+     data = {
+          "calibracionVerificacion": {
+               "id": cv.id,
+               "numero": cv.numero,
+               "equipoUtilizado":cv.equipoUtilizado,
+               "idEquipo":cv.idEquipo,
+               "marcaEquipo":cv.marcaEquipo,
+               "modeloEquipo":cv.modeloEquipo,
+               "serialEquipo": cv.serialEquipo,
+               # "fecha": cv.fecha,          # añade tus campos
+          },
+          "calibracionConductiva": (
+               model_to_dict(cc) if cc else None
+          ),
+          "laboratorio": None,
+          "campo": None,
+     }
+
+     if lab:
+        data["laboratorio"] = {
+            **model_to_dict(lab),
+            "aceptacionMr": (
+                model_to_dict(lab.conductividadAceptacionMr)
+                if getattr(lab, "conductividadAceptacionMr", None) else None
+            ),
+            "aceptacionMc": (
+                model_to_dict(lab.conductividadAceptacionMc)
+                if getattr(lab, "conductividadAceptacionMc", None) else None
+            ),
+        }
+
+     if cam:
+        data["campo"] = {
+            **model_to_dict(cam),
+            "aceptacionMr": (
+                model_to_dict(cam.conductividadAceptacionMr)
+                if getattr(cam, "conductividadAceptacionMr", None) else None
+            ),
+            "aceptacionMc": (
+                model_to_dict(cam.conductividadAceptacionMc)
+                if getattr(cam, "conductividadAceptacionMc", None) else None
+            ),
+        }
+
+     return JsonResponse(data)
+     

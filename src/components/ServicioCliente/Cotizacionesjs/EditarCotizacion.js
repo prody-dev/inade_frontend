@@ -38,7 +38,7 @@ const EditarCotizacion = () => {
      const organizationId = useMemo(() => parseInt(localStorage.getItem("organizacion_id"), 10), []);
      useEffect(() => {
       const verificar = async () => {
-        console.log(id);
+        // console.log(id);
         const acceso = await validarAccesoPorOrganizacion({
           fetchFunction: getAllcotizacionesdata ,
           organizationId,
@@ -47,7 +47,7 @@ const EditarCotizacion = () => {
           navigate,
           mensajeError: "Acceso denegado a esta precotización.",
         });
-        console.log(acceso);
+        // console.log(acceso);
         if (!acceso) return;
       };
   
@@ -257,7 +257,7 @@ const EditarCotizacion = () => {
         
           // Obtener el servicio seleccionado de la lista de servicios
           const servicioSeleccionado = servicios.find(servicio => servicio.id === servicioId);
-          console.log("Servicio seleccionado:", servicioSeleccionado);
+          // console.log("Servicio seleccionado:", servicioSeleccionado);
         
           if (servicioSeleccionado) {
             const updatedConceptos = conceptos.map((concepto) =>
@@ -270,7 +270,7 @@ const EditarCotizacion = () => {
                     nombreServicio: servicioSeleccionado.nombreServicio, // ✅ Mantenemos el nombre
                     metodoCodigo: servicioSeleccionado.metodos,
                   }
-                : concepto
+                : concepto 
             );
             //console.log("Conceptos actualizados:", updatedConceptos);
             setConceptos(updatedConceptos);
@@ -375,7 +375,7 @@ const EditarCotizacion = () => {
             cantidad: parseInt(concepto.cantidad, 10),
             precio: parseFloat(concepto.precioFinal),
             servicio: parseInt(concepto.servicio, 10),
-            descripcion: concepto.descripcion,
+            descripcion: concepto.descripcion || "Sin Descripción..",
             cotizacion: parseInt(id, 10),
           };
     
@@ -402,7 +402,7 @@ const EditarCotizacion = () => {
               cantidad: parseInt(concepto.cantidad, 10),
               precio: parseFloat(concepto.precioFinal),
               servicio: parseInt(concepto.servicio, 10),
-              descripcion: concepto.descripcion,
+              descripcion: concepto.descripcion || "Sin Descripción...",
               cotizacion: parseInt(id, 10),
             };
             //console.log("📤 Enviando nuevo servicio:", data);
